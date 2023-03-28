@@ -1,4 +1,4 @@
-import { Component } from "react";
+import { useEffect, useState } from "react";
 
 import { ToastContainer } from 'react-toastify';
 import { toast } from 'react-toastify';
@@ -13,90 +13,76 @@ import Button from "components/Button/Button";
 import Modal from "components/Modal/Modal";
 import Spinner from "components/Loader/Loader";
 
-export default class App extends Component {
+export default function App () {
 
-  state = {
-    status: 'idle',
-    query: [],
-    page: 1,
-    name: '',
-    modalAlt: '',
-    showModal: false,
-    modalImg: '',
-    error: null,
+  const [images, setImages] = useState ([])
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('idle');
+  const [page, setPage] = useState(1);
+  const [modalImg, setModalImg] = useState('');
+  const [modalAlt, setModalAlt] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (query.trim() === '') {
+      return;
+    }
+
+    setStatus('pending');
+    
+    API.fetchQuery(query, page)
+      .then(({ hits }) => {
+        const images = hits.map(({ id, webformatURL, largeImageURL, tags }) => {
+          return { id, webformatURL, largeImageURL, tags };
+        });
+        if (images.length > 0) {
+          setImages(state => [...state, ...images]);
+          setStatus('resolved')
+        } else {
+          toast.error(`По запиту ${query} ми нічого не знайшли.`);
+          setStatus('idle');
+        }
+      }).catch(error => {
+        setError(error);
+        setStatus('rejected');
+      })},[page, query]);
+ 
+
+  const handleSubmitInput = newQuery => {
+    if (newQuery !== query) {
+      setImages([]);
+      setPage(1);
+      setQuery(newQuery);
+    }
   };
-
-componentDidUpdate(_, prevState) {
-    const prevQuery = prevState.name;
-    const nextQuery = this.state.name;
-
-    const prevPage = prevState.page;
-    const nextPage = this.state.page;
-
-    if (prevQuery !== nextQuery) {
-      this.setState({ query: [], status: 'pending' });
-    }
-
-    if (prevQuery !== nextQuery || prevPage !== nextPage) {
-      API
-        .fetchQuery(nextQuery, nextPage)
-        .then(({ hits }) => {
-          const images = hits.map(({ id, webformatURL, largeImageURL, tags }) => {
-            return { id, webformatURL, largeImageURL, tags };
-          });
-          if (images.length > 0) {
-            this.setState(prevState => {
-              return {
-                query: [...prevState.query, ...images],
-                status: 'resolved',
-              };
-            });
-          } else {
-            toast.error(`По запиту ${nextQuery} ми нічого не знайшли.`);
-            this.setState({ status: 'idle' });
-          }
-        })
-        .catch(error => this.setState({ error, status: 'rejected' }));
-    }
-  }  
-
-handleSubmitInput = newQuery => {
-    if (newQuery !== this.state.name) {
-      this.setState({ name: newQuery, page: 1, status: 'pending' });
-    }
-};
   
-handleClickImg = event => {
+const handleClickImg = event => {
     const imgForModal = event.target.dataset.src;
     const altForModal = event.target.alt;
   if (event.target.nodeName !== 'IMG') {
         return;
       }  
   
-  this.setState({
-      showModal: true,
-      modalImg: imgForModal,
-      modalAlt: altForModal,
-    });
+  setModalImg(imgForModal);
+  setModalAlt(altForModal);
+  setShowModal(true);
   };
   
-  handleClickBtn = () => {
-    this.setState(({ page }) => {
-      return { page: page + 1, status: 'pending' };
-    });
+ const handleClickBtn = () => {
+   setPage(state => state + 1);
+    setStatus('pending');
+ };
+  
+  const toggleModal = () => {
+    setShowModal(!showModal);
   };
-toggleModal = () => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-    }));
-  };
-  render() {
-    const { query, showModal, modalImg, modalAlt, error, status } = this.state;
-
-      if (status === 'idle') {
+  
+  
+  if (status === 'idle') {
       return (
         <div>
-          <Searchbar onSubmit={this.handleSubmitInput} />
+          <Searchbar onSubmit={handleSubmitInput} />
           <ToastContainer autoClose={2000}/>
         </div>
       );
@@ -105,8 +91,8 @@ toggleModal = () => {
     if (status === 'pending') {
       return (
         <div>
-          <Searchbar onSubmit={this.handleSubmitInput} />
-          {this.state.query.length > 0 && <ImageGallery query={query} />}
+          <Searchbar onSubmit={handleSubmitInput} />
+          {query.length > 0 && <ImageGallery query={images} />}
           <Spinner className={s.Loader} />
         </div>
       );
@@ -120,21 +106,16 @@ toggleModal = () => {
       return (
         <>
           {showModal && (
-            <Modal onClose={this.toggleModal}>
+            <Modal onClose={toggleModal}>
               <img src={modalImg} alt={modalAlt} />
             </Modal>
           )}
           <div>
-            <Searchbar onSubmit={this.handleSubmitInput} />
-            <ImageGallery onClickImg={this.handleClickImg} query={this.state.query} />
-            {this.state.query.length > 11 && <Button handleClickBtn={this.handleClickBtn} />}
+            <Searchbar onSubmit={handleSubmitInput} />
+            <ImageGallery onClickImg={handleClickImg} query={images} />
+            {images.length > 11 && <Button handleClickBtn={handleClickBtn} />}
           </div>
         </>
       );
     }
-  }
-  }
-
-
-
-
+} 
